@@ -10,7 +10,7 @@ import sys
 
 SONG_REQ_LIMIT = 15
 
-playlists = ["Favourites"]
+library = ["Favourites"]
 
 def main():
     while True:
@@ -45,7 +45,14 @@ def main():
 
         elif choice == "my library":
             # Show library to user
-
+            playlists = get_library_overview()
+            
+            print("Library \n _____________________\n")
+            i = 1
+            for playlist, song_count in playlists:
+                print(f"{i}. {playlist:<20} ({song_count} songs)")
+                i += 1
+            print()
 
 
 
@@ -115,7 +122,7 @@ def save_to_library(song):
     # Determine playlist to save song to
     print("Save To:\n")
     i = 0
-    for playlist in playlists:
+    for playlist in library:
         i += 1
         print(f"{i}. {playlist}")
 
@@ -126,9 +133,9 @@ def save_to_library(song):
     if action == 0:
         # Create new playlist
         save_to_library(song)
-    elif action in range(1, len(playlists) + 1):
+    elif action in range(1, len(library) + 1):
         # Determine if file exists (if not write file headers)
-        song["playlist"] = playlists[action - 1]
+        song["playlist"] = library[action - 1]
         file_exist = os.path.exists("library.csv")
         # open/create file
         with open("library.csv", "a", newline="") as file:
@@ -139,7 +146,11 @@ def save_to_library(song):
             writer.writerow(song)
     else:
         print("Invalid Input")
-                
+
+
+def get_library_overview():
+    # Determine playlists and sizes and return list of dictionaries with playlist:song_count key-value pairs
+    return    
 
 
 # Searching Sub-Menu functionality
