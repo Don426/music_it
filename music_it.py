@@ -14,10 +14,9 @@ ARTIST_REQ_LIMIT = 5
 library = ["Favourites"]
 
 def main():
+    # Populate global playlist array
+    populate_library_playlists()
     while True:
-        # Populate global playlist array
-        populate_library_playlists()
-
         # Extract user action, handle exiting and termination of program through home_menu function
         choice = home_menu()
 
@@ -35,12 +34,12 @@ def main():
             elif search_choice == "song name":
                 #get song choice from user
                 song = input("\nSearch for song: ")
-                songs = request_song(song)
+                songs_results = request_song(song, False)
                 action = int(input("\nEnter a number to save a song to your library, or 0 to go back: "))
                 if action == 0:
                     continue
                 elif action in range(1, SONG_REQ_LIMIT + 1):
-                    save_to_library(songs[action - 1])
+                    save_to_library(songs_results[action - 1])
 
             # If user chooses to search by artist, the program will extract the artist name and call api function
             elif search_choice == "artist/band name":
@@ -50,7 +49,18 @@ def main():
                 if artist_choice == 0:
                     continue
                 elif artist_choice in range(1, ARTIST_REQ_LIMIT + 1):
-                    request_song(artists[artist_choice-1])
+                    # UI heading
+                    print(f"\n{artists[artist_choice - 1]}\n________________________")
+                    # Empty/Reassign songs list
+                    songs_results = []
+                    # API request for songs by chosen artist
+                    songs_results = request_song(artists[artist_choice-1], True)
+                    action = int(input("\nEnter a number to save a song to your library, or 0 to go back: "))
+                    if action == 0:
+                        continue
+                    elif action in range(1, SONG_REQ_LIMIT + 1):
+                        save_to_library(songs_results[action - 1])
+
 
         elif choice == "my library":
             # Show library to user
@@ -65,8 +75,25 @@ def main():
             else:
                 playlist_name = playlists[library_action - 1][0]
                 # Songs: List of tuples (song_name, artist)
-                songs = get_playlist(playlist_name)
-                display_playlist(playlist_name, songs)
+                playlist_songs = get_playlist(playlist_name)
+                display_playlist(playlist_name, playlist_songs)
+
+                # Retrieve action inside library i f playlist is populated
+                if playlist_songs:
+                    library_action = int(input("\nEnter a number to manage a song, or 0 to go back: "))
+                    if library_action == 0: # Back
+                        continue
+                    else:
+                        song_action = song_management_menu(playlist_songs[library_action - 1])
+                        if song_action == 0: # Back
+                            continue
+                        elif song_action == 1: # Remove song
+                            # Remove song from playlist
+                            remove_song(playlist_songs[song_action - 1][0])
+                # If playlist is empty allow user to go back only, to avoid out of range errors
+                elif input("Press Enter to Go Back. "):
+                    continue
+                            
             
 
 
@@ -154,12 +181,12 @@ def save_to_library(song):
         print(f"{i}. {playlist}")
 
     action = int(input(f"\nEnter a number to save {song['name']} to a playlist,"
-                   " or 0 to create a new playlist: "))
+                   " 0 to create a new playlist, or -1 to go back: "))
     
     # Save it to song
     if action == 0:
         # Create new playlist
-        library.append(input("\nPlaylist Name: ").title())
+        library.append(input("\nPlaylist Name: "))
 
         # Call function again
         save_to_library(song)
@@ -174,6 +201,8 @@ def save_to_library(song):
                 writer.writeheader()
             
             writer.writerow(song)
+    elif action == -1:
+        return
     else:
         print("Invalid Input")
 
@@ -210,29 +239,62 @@ def display_library(playlists):
     print()
 
 def get_playlist(playlist_name):
-    # Loop through CSV, return list of tuples (song_name, artist)
+    # Loop through CSV, return list of lists (song_id, song_name, artist)
     songs = []
     if os.path.exists("library.csv"):
         with open("library.csv") as file:
             reader = csv.DictReader(file)
 
             for song in reader:
-                songs.append((song["name"], song["artist"]))
+                if song["playlist"] == playlist_name:
+                    songs.append([song["id"], song["name"], song["artist"]])
 
         return songs
 
-    else: print("Error retrieving library")
+    else: 
+        print("Error retrieving library")
+        return []
 
 def display_playlist(playlist_name, songs):
-    # Loop through list of song tuples and display
-    print(f"\n{playlist_name}\n___________________")
-    print(f"{'No.':<5} {'Song':<40} {'Artist'}")
-    i = 1
-    for song, artist in songs:
-        print(f"{i}{'.':<5}{song:<40} {artist}")
-        i += 1
+    # Ensure the playlist is populated with any number of songs
+    if songs:
+        # Loop through list of song tuples and display
+        print(f"\n{playlist_name}\n___________________")
+        print(f"{'No.':<5} {'Song':<40} {'Artist'}")
+        i = 1
+        for id, song, artist in songs:
+            print(f"{i}{'.':<5}{song:<40} {artist}")
+            i += 1
+    # However if empty, handle the exception neatly
+    else:
+        print(f"\n{playlist_name}\n___________________")
+        print("Empty Playlist\n")
+
         
 
+def song_management_menu(song_details):
+    print(f"{song_details[1]} - {song_details[2]}")
+    print("1. Remove from Playlist\n")
+    action = int(input("Enter your choice (number), or 0 to go back: "))
+    return action
+
+
+def remove_song(song_id):
+    lines = []
+    with open("library.csv") as file:
+        reader = csv.DictReader(file)
+        # Get fieldnames for writing
+        fieldnames = reader.fieldnames
+        # Loop through file copying only songs not being deleted
+        for line in reader:
+            if not (line["id"] == song_id):
+                lines.append(line)
+
+    # Rewrite file without the removed song
+    with open("library.csv", "w", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(lines)
 
 # Searching Sub-Menu functionality
 def search_menu():
